@@ -1,0 +1,5 @@
+glut/
+cmake-build-*/
+.idea/
+GL/
+ConsoleApplication*
