@@ -26,30 +26,16 @@ private:
     size_t _previous_empty_element;
   };
 
-  enum Range_state
-  {
-    FREE,
-    READING,
-    WRITING
-  };
-
-  enum Copy_used
-  {
-    NONE,
-    FIRST,
-    SECOND
-  };
-
   struct Range
   {
     size_t _start_index;
-
-    mutable std::atomic<Range_state> _state;
   };
 
   struct Part
   {
     mutable std::atomic<size_t> _range_index;
+    size_t _first_free_element;
+    size_t _last_empty_element;
     size_t _elements_number;
   };
 
@@ -60,14 +46,19 @@ public:
       : _ranges_size(size / parts_number + 1),
         _ranges(parts_number + _additional_ranges_number),
         _parts(parts_number),
-        _first_free_elements_of_parts(parts_number, 0),
+        _free_ranges({parts_number, parts_number + 1}),
         _reading_range(0)
   {
     _elements.reserve(_ranges_size * _parts.size());
 
     for (size_t i = 0; i < _parts.size(); ++i)
     {
-      _parts[i] = { i, _ranges_size };
+      _parts[i] = { i, 0, _ranges_size - 1, _ranges_size };
+    }
+
+    for (size_t i = 0; i < _ranges.size(); ++i)
+    {
+      _ranges[i] = { i * _ranges_size };
     }
 
     _parts.back()._elements_number = size - (parts_number - 1) * _ranges_size;
@@ -98,10 +89,12 @@ public:
           std::optional<Value_type> (const std::optional<std::reference_wrapper<const Value_type> >&)
       >& function)
   {
-    for (const Part& part : _parts)
+    for (Part& part : _parts)
     {
-      u_char free_range_index = _free_ranges[0] != _reading_range.load() ? 0 : 1;
-      size_t destination_range_index = _free_ranges[free_range_index];
+      size_t next_free_element = part._first_free_element;
+      size_t previous_free_element = part._last_empty_element;
+      const u_char free_range_index = _free_ranges[0] != _reading_range.load() ? 0 : 1;
+      const size_t destination_range_index = _free_ranges[free_range_index];
 
       const Range& destination_range = _ranges[destination_range_index];
       const size_t source_range_index = part._range_index.load();
@@ -109,19 +102,62 @@ public:
 
       for (size_t i = 0; i < part._elements_number; ++i)
       {
-        auto value_pointer = std::get_if<Value_type>(&_elements[source_range._start_index + i]);
-        std::optional<Value_type> result = value_pointer ? function(*value_pointer) : function(std::nullopt);
+        std::optional<Value_type> result;
 
-        if (!result)
+        auto value_pointer = std::get_if<Value_type>(&_elements[source_range._start_index + i]);
+        if (value_pointer)
         {
-          continue;
+          result = function(*value_pointer);
+
+          if (!result)
+          {
+            _elements[source_range._start_index + i] = Empty_element{ next_free_element, previous_free_element };
+
+            previous_free_element = i;
+
+            std::get<Empty_element>(
+                _elements[source_range._start_index + previous_free_element]
+            )._next_empty_element = i;
+
+            std::get<Empty_element>(
+                _elements[source_range._start_index + next_free_element]
+            )._previous_free_element = i;
+          }
+        }
+        else
+        {
+          result = function(std::nullopt);
+
+          std::tie(next_free_element, previous_free_element) =
+              std::get<Empty_element>(
+                  _elements[source_range._start_index + i]
+              );
+
+          if (result)
+          {
+            std::get<Empty_element>(
+                _elements[source_range._start_index + previous_free_element]
+            )._next_empty_element = next_free_element;
+
+            std::get<Empty_element>(
+                _elements[source_range._start_index + next_free_element]
+            )._previous_free_element = previous_free_element;
+          }
+          else
+          {
+            previous_free_element = i;
+          }
         }
 
-        _elements[destination_range._start_index + i] = result;
+
+        if (result)
+        {
+          _elements[destination_range._start_index + i] = result.value();
+        }
       }
 
-      _free_ranges[free_range_index] = source_range_index;
       part._range_index.store(destination_range_index);
+      _free_ranges[free_range_index] = source_range_index;
     }
   }
 
@@ -131,7 +167,6 @@ private:
 
   std::vector<std::variant<Empty_element, Value_type> > _elements;
   std::vector<Part> _parts;
-  std::vector<size_t> _first_free_elements_of_parts;
   std::array<size_t, _additional_ranges_number> _free_ranges;
   mutable std::atomic<size_t> _reading_range;
 };
