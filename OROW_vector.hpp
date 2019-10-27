@@ -48,6 +48,18 @@ private:
     mutable std::atomic<Copy_used> _copy_used;
   };
 
+private:
+  void update_from_copy(const Range& range)
+  {
+    auto destination = _elements.begin();
+    std::advance(destination, range._start_index);
+
+    std::copy_n(
+        _copies[range._copy_used.load()].begin(),
+        range._end_index - range._start_index,
+        destination);
+  }
+
 public:
   OROW_vector(size_t size, size_t parts_number)
     : _elements(size, Empty_element{}),
@@ -76,10 +88,10 @@ public:
 
       Part_state previous_state =
           compare(part._state).
-            template _with_one_of_and_swap<
-                Swap<Part_state::FREE>::to<Part_state::WRITING>,
-                Swap<Part_state::WRITING>::to<Part_state::READING_AND_WRITING>
-            >();
+            template _and_swap_with_one_of<
+                         Change<Part_state::FREE>::template To<Part_state::WRITING>,
+                         Change<Part_state::WRITING>::template To<Part_state::READING_AND_WRITING>
+                     >();
 
       for (size_t i = part._start_index; i < part._end_index; ++i)
       {
@@ -91,20 +103,14 @@ public:
 
       previous_state =
           compare(part._state).
-              template _with_one_of_and_swap<
-                  Swap<Part_state::READING_AND_WRITING>::to<Part_state::WRITING>,
-                  Swap<Part_state::READING>::to<Part_state::FREE>
-              >();
+              template _and_swap_with_one_of<
+                           Change<Part_state::READING_AND_WRITING>::template To<Part_state::WRITING>,
+                           Change<Part_state::READING>::template To<Part_state::FREE>
+                       >();
 
       if (previous_state == Part_state::READING && part._copy_used.load() != Copy_used::NONE)
       {
-        auto destination = _elements.begin();
-        std::advance(destination, part._start_index);
-
-        std::copy_n(
-            _copies[part._copy_used.load()].begin(),
-            part._end_index - part._start_index,
-            destination);
+        update_from_copy(part);
 
         part._copy_used.store(Copy_used::NONE);
       }
@@ -114,12 +120,36 @@ public:
   void call_function_for_all_elements(
          const std::function<
                      std::optional<Value_type> (const std::optional<std::reference_wrapper<const Value_type> >&)
-         >& function);
+               >& function)
+  {
+    using namespace Atomic_meta;
+
+    for (const Range& part : _parts)
+    {
+      Part_state previous_state =
+          compare(part._state).
+              template _and_swap_with_one_of<
+                           Change<Part_state::FREE>::template To<Part_state::WRITING>,
+                           Change<Part_state::WRITING>::template To<Part_state::READING_AND_WRITING>
+                       >();
+
+      for (size_t i = part._start_index; i < part._end_index; ++i)
+      {
+        auto value_pointer = std::get_if<Value_type>(&_elements[i]);
+        std::optional<Value_type> result = value_pointer ? function(*value_pointer) : function(std::nullopt);
+
+        if (!result)
+        {
+          continue;
+        }
+      }
+    }
+  }
 
 private:
   std::vector<std::variant<Empty_element, Value_type> > _elements;
 
   std::vector<Range> _parts;
   std::vector<size_t> _first_free_elements_of_parts;
-  mutable std::array<std::vector<Empty_element, Value_type>, 2> _copies;
+  mutable std::array<std::vector<std::variant<Empty_element, Value_type>>, 2> _copies;
 };
