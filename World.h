@@ -9,16 +9,21 @@
 template <size_t dimensions_number>
 struct World
 {
-  struct Radius_vector : public std::array<size_t, dimensions_number> // TODO fix type (size_t to double?)
+  template <typename Value_type>
+  struct Vector : public std::array<Value_type, dimensions_number> // TODO fix type (size_t to double?)
   {
 
   };
 
+  using Radius_vector = Vector<double>;
+  using Position_vector = Vector<size_t>;
+
+  constexpr static size_t _particles_pack_size = 64;
   constexpr static Radius_vector _acceleration = { 0, 1 };
 
   struct Particle
   {
-    Radius_vector _position;
+    Position_vector _position;
     Radius_vector _velocity;
     size_t _lifetime;
 
@@ -26,7 +31,7 @@ struct World
   };
 
 
-  using Particles_pack = std::array<Particle, 64>;
-  using Explosion = Radius_vector;
+  using Particles_pack = std::array<Particle, _particles_pack_size>;
+  using Explosion = Position_vector;
 };
 

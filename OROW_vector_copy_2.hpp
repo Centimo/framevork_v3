@@ -49,7 +49,7 @@ public:
         _parts(parts_number),
         _free_ranges({parts_number, parts_number + 1}),
         _reading_range(0),
-        _free_elements_number(size)
+        _empty_elements_number(size)
   {
     _elements.reserve(_ranges_size * _parts.size());
 
@@ -88,14 +88,15 @@ public:
 
   void call_function_for_all_elements(
       const std::function<
-          std::optional<Value_type> (const std::optional<std::reference_wrapper<const Value_type> >&, const size_t)
+          std::optional<Value_type> (const std::optional<std::reference_wrapper<const Value_type> >&, bool&)
       >& function)
   {
     for (size_t part_index = 0; part_index < _parts.size(); ++part_index)
     {
+      bool is_stop = false;
       Part& part = _parts[part_index];
-      size_t next_free_element = part._first_free_element;
-      size_t previous_free_element = part._last_empty_element;
+      size_t next_empty_element = part._first_free_element;
+      size_t previous_empty_element = part._last_empty_element;
       const u_char free_range_index = _free_ranges[0] != _reading_range.load() ? 0 : 1;
       const size_t destination_range_index = _free_ranges[free_range_index];
 
@@ -110,89 +111,95 @@ public:
         auto value_pointer = std::get_if<Value_type>(&_elements[source_range._start_index + element_index]);
         if (value_pointer)
         {
-          result = function(*value_pointer, part_index);
+          result = function(*value_pointer, is_stop);
 
           if (!result)
           {
             _elements[source_range._start_index + element_index] =
                 Empty_element
                 {
-                    part._free_elements_number ? next_free_element : element_index,
-                    part._free_elements_number ? previous_free_element : element_index
+                    part._free_elements_number ? next_empty_element : element_index,
+                    part._free_elements_number ? previous_empty_element : element_index
                 };
 
-            previous_free_element = element_index;
+            previous_empty_element = element_index;
 
             if (part._free_elements_number)
             {
               std::get<Empty_element>(
-                  _elements[source_range._start_index + previous_free_element]
+                  _elements[source_range._start_index + previous_empty_element]
               )._next_empty_element = element_index;
 
               std::get<Empty_element>(
-                  _elements[source_range._start_index + next_free_element]
-              )._previous_free_element = element_index;
+                  _elements[source_range._start_index + next_empty_element]
+              )._previous_empty_element = element_index;
             }
 
             ++part._free_elements_number;
-            ++_free_elements_number;
+            ++_empty_elements_number;
           }
         }
         else
         {
-          result = function(std::nullopt, part_index);
+          result = function(std::nullopt, is_stop);
 
-          std::tie(next_free_element, previous_free_element) =
-              std::get<Empty_element>(
-                  _elements[source_range._start_index + element_index]
-              );
+          {
+            const Empty_element& element =
+                std::get<Empty_element>(
+                    _elements[source_range._start_index + element_index]
+                );
+
+            next_empty_element = element._next_empty_element;
+            previous_empty_element = element._previous_empty_element;
+          }
 
           if (result)
           {
             --part._free_elements_number;
-            --_free_elements_number;
+            --_empty_elements_number;
 
             if (part._free_elements_number)
             {
               std::get<Empty_element>(
-                  _elements[source_range._start_index + previous_free_element]
-              )._next_empty_element = next_free_element;
+                  _elements[source_range._start_index + previous_empty_element]
+              )._next_empty_element = next_empty_element;
 
               std::get<Empty_element>(
-                  _elements[source_range._start_index + next_free_element]
-              )._previous_free_element = previous_free_element;
+                  _elements[source_range._start_index + next_empty_element]
+              )._previous_empty_element = previous_empty_element;
             }
           }
           else
           {
-            previous_free_element = element_index;
+            previous_empty_element = element_index;
           }
         }
-
 
         if (result)
         {
           _elements[destination_range._start_index + element_index] = result.value();
         }
+
+        if (is_stop)
+        {
+          break;
+        }
       }
 
       part._range_index.store(destination_range_index);
       _free_ranges[free_range_index] = source_range_index;
+
+      if (is_stop)
+      {
+        return;
+      }
     }
   }
 
-  /*
-  void call_function_for_all_empty_elements(
-      const std::function<
-          std::optional<Value_type> (const size_t)
-      >& function)
+  size_t ger_empty_elements_number() const
   {
-    for (size_t part_index = 0; part_index < _parts.size(); ++part_index)
-    {
-
-    }
+    return _empty_elements_number.load();
   }
-   */
 
 private:
   const size_t _ranges_size;
@@ -202,5 +209,5 @@ private:
   std::vector<Part> _parts;
   std::array<size_t, _additional_ranges_number> _free_ranges;
   mutable std::atomic<size_t> _reading_range;
-  std::atomic<size_t> _free_elements_number;
+  std::atomic<size_t> _empty_elements_number;
 };
