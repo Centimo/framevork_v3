@@ -51,6 +51,8 @@ void Engine::thread_worker(Thread_data& thread_data)
 
     thread_data.add_particles(particles_packs);
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
     current_global_time_ms = _current_global_time_ms.load();
   }
 }
@@ -84,7 +86,7 @@ void Engine::update_global_time(size_t delta_t_ms)
   _current_global_time_ms.fetch_add(delta_t_ms);
 }
 
-Engine::Engine(size_t threads_number) 
+Engine::Engine(size_t threads_number) : _is_stop(false)
 {
   if (threads_number == 0)
   {
@@ -161,6 +163,11 @@ void Engine::Thread_data::add_particles(const Particles_packs_array& particles_p
     }
   }
 
+  if (!particles_number)
+  {
+    return;
+  }
+
   size_t mininmal_lifetime_border = 0;
   {
     int number_of_particles_to_replace = particles_number - _particles.ger_empty_elements_number();
@@ -188,8 +195,8 @@ void Engine::Thread_data::add_particles(const Particles_packs_array& particles_p
 
         const auto& result =
             particles_packs
-              [particles_number / _max_explosions_pops_per_cycle].value()
-                [particles_number % _max_explosions_pops_per_cycle];
+              [(particles_number - 1) / World_t::_particles_pack_size].value()
+                [(particles_number - 1) % World_t::_particles_pack_size];
 
         if (!particle_optional
             || particle_optional.value().get()._lifetime >=  mininmal_lifetime_border)
@@ -220,7 +227,7 @@ Engine::Particles_by_lifetime_counter::Particles_by_lifetime_counter()
 
 void Engine::Particles_by_lifetime_counter::add_particle(const size_t lifetime_ms)
 {
-  for (size_t i = _counter.size() - 1; i >= 0; --i)
+  for (int i = _counter.size() - 1; i >= 0; --i)
   {
     if (lifetime_ms >= _counter[i][0])
     {

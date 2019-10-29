@@ -39,15 +39,11 @@ public:
     }
   }
 
-  Value_type& get_reference(const unsigned char id)
-  {
-    return _queue[id];
-  }
-
-  unsigned char get_last_value_id()
-  {
-    return static_cast<unsigned char>(_current_free_value_keeper.load() % _capacity - 1);
-  }
+  Atomic_queue() :
+    _current_free_value_keeper(0),
+    _current_first_value(0),
+    _size(0) 
+  { }
 
   std::optional<Value_type> pop()
   {

@@ -23,6 +23,23 @@ class RCU_cell_light
     std::atomic<bool> _is_writing;
 
     Value_type _value;
+
+    Cell& operator = (const Cell& source)
+    {
+      _readers_counter.store(0);
+      _is_writing.store(false);
+      _value = source._value;
+      return *this;
+    }
+
+    /*
+    RCU_cell_light& operator = (const RCU_cell_light& source_cell)
+    {
+      _read_cell_pointer_id.store(0);
+      _is_writing_state.clear();
+      _elements.fill(Cell{ 0, false, source_cell.read() });
+    }
+    */
   };
 
   static constexpr size_t _copies_number = 2;
@@ -52,15 +69,17 @@ private:
 public:
   RCU_cell_light() :
       _read_cell_pointer_id(0),
-      _is_writing_state(ATOMIC_FLAG_INIT),
-      _elements({Cell{0, false, Value_type()}, Cell{0, false, Value_type()}})
-  {  }
+      _is_writing_state{ ATOMIC_FLAG_INIT }
+  {
+    _elements.fill(Cell{0, false, Value_type()});
+  }
 
   explicit RCU_cell_light(const Value_type& value) :
       _read_cell_pointer_id(0),
-      _is_writing_state(ATOMIC_FLAG_INIT),
-      _elements({Cell{0, false, value}, Cell{0, false, value}})
-  {  }
+      _is_writing_state{ ATOMIC_FLAG_INIT }
+  {
+    _elements.fill(Cell{ 0, false, value });
+  }
 
 
   Value_type read() const
