@@ -3,3 +3,7 @@ cmake-build-*/
 .idea/
 GL/
 ConsoleApplication*
+
+Release/
+Debug/
+x64/
