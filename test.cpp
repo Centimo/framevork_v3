@@ -1,11 +1,14 @@
-
+#include <memory>
 #include <math.h>
 #include <vector>
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <iostream>
 
 #include "./nvToolsExt.h"
+
+#include "Engine.h"
 
 #include "test.h"
 
@@ -16,6 +19,7 @@
 static std::atomic<float> globalTime;
 static volatile bool workerMustExit = false;
 
+static std::unique_ptr<Engine> engine = nullptr;
 
 // some code
 
@@ -43,6 +47,7 @@ void WorkerThread(void)
 void test::init(void)
 {
 	// some code
+  engine.reset(new Engine());
 
 	std::thread workerThread(WorkerThread);
 	workerThread.detach(); // Glut + MSVC = join hangs in atexit()
@@ -75,6 +80,7 @@ void test::update(int dt)
 
 	float time = globalTime.load();
 	globalTime.store(time + dt);
+  std::cout << "Delta_t: " << dt << std::endl;
 
 	// some code
 }
