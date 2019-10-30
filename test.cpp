@@ -62,7 +62,6 @@ void WorkerThread(void)
 	}
 }
 
-
 void test::init(void)
 {
   engine.reset(new Engine({ test::SCREEN_WIDTH, test::SCREEN_HEIGHT }));
