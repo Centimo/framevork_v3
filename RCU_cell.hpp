@@ -13,8 +13,8 @@
 
 template <
     typename Value_type,
-    size_t writing_state_sleep_mcs = 1,
-    size_t writing_cell_sleep_mcs = 0>
+    size_t writing_state_sleep_mcs = 10,
+    size_t writing_cell_sleep_mcs = 10>
 class RCU_cell_light
 {
   struct Cell
@@ -53,8 +53,8 @@ private:
     while (current_write_reference._readers_counter.load() != 0)
     {
 
-      std::this_thread::yield();
-      // std::this_thread::sleep_for(std::chrono::microseconds(writing_cell_sleep_mcs));
+      //std::this_thread::yield();
+      std::this_thread::sleep_for(std::chrono::microseconds(writing_cell_sleep_mcs));
       if (_wait_counter)
       {
         _wait_counter->fetch_add(1);
@@ -104,13 +104,9 @@ public:
 
   void write(const Value_type& value, std::atomic<size_t>* _wait_counter = nullptr)
   {
-    while (_is_writing_state.test_and_set(std::memory_order_acquire))
+    while (_is_writing_state.test_and_set(std::memory_order::memory_order_relaxed))
     {
       std::this_thread::sleep_for(std::chrono::microseconds(writing_state_sleep_mcs));
-      if (_wait_counter)
-      {
-        _wait_counter->fetch_add(1);
-      }
     }
 
     auto read_pointer_index = _read_cell_pointer_id.load();
@@ -119,7 +115,7 @@ public:
 
     ++_read_cell_pointer_id;
 
-    return _is_writing_state.clear(std::memory_order_release);
+    return _is_writing_state.clear();
   }
 
 private:

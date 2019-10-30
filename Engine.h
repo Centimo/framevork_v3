@@ -8,8 +8,11 @@
 #include <limits>
 #include <random>
 #include <cmath>
+#include <string>
 
 #include "Atomic_queue.hpp"
+#include "Lock_queue.hpp"
+#include "Lock_vector.hpp"
 #include "World.hpp"
 #include "OROW_vector_copy_2.hpp"
 
@@ -20,12 +23,12 @@ class Engine
 
   using World_t = World<_dimensions_number>;
 
-  constexpr static size_t _total_particles_number = 64 * World_t::_particles_pack_size;
-  constexpr static size_t _parts_number_per_thread = 8;
+  constexpr static size_t _total_particles_number = 2048 * World_t::_particles_pack_size;
+  constexpr static size_t _parts_number_per_thread = 64;
   constexpr static size_t _max_explosions_pops_per_cycle = 5;
-  constexpr static double _probability_of_disappearing = 0.2;
-  constexpr static double _probability_of_exploding = 0.1;
-  constexpr static double _scale_for_weibull = 20.0;
+  constexpr static double _probability_of_disappearing = 0.02;
+  constexpr static double _probability_of_exploding = 0.003;
+  constexpr static double _scale_for_weibull = 80.0;
 
 
   using Particles_packs_array = std::array< std::optional<World_t::Particles_pack>, _max_explosions_pops_per_cycle>;
@@ -43,9 +46,12 @@ class Engine
 
   class Random_generator
   {
+    std::random_device _random_device;
     std::mt19937 _generator;
 
   public:
+    Random_generator();
+
     bool get_random_bool_from_probability(double probability);
     float get_random_float_from_weibull(double scale);
   };
@@ -54,6 +60,7 @@ class Engine
   {
     OROW_vector<World_t::Particle> _particles;
     Atomic_queue<World_t::Explosion> _explosions;
+    Atomic_queue<World_t::Explosion> _explosions_from_user;
     Engine& _engine;
     Particles_by_lifetime_counter _particles_counter;
     Random_generator _random_generator;

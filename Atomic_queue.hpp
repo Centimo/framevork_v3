@@ -8,27 +8,26 @@
 #include <array>
 #include <optional>
 
+#include "utils.h"
 #include "RCU_cell.hpp"
-#include "utils.hpp"
 
-template <typename Value_type, size_t power_of_two_for_capacity = 8>
+
+template <typename Value_type>
 class Atomic_queue
 {
-  constexpr static size_t _capacity = utils::Power<2, power_of_two_for_capacity>::result;
-
 public:
 
-  unsigned char push(const Value_type& value)
+  size_t push(const Value_type& value)
   {
-    auto current_id = _current_free_value_keeper.fetch_add(1) % _capacity;
+    size_t current_id = _current_free_value_keeper.fetch_add(1) % _capacity;
     _queue[current_id].write(value);
     _size.fetch_add(1);
     return current_id;
   }
 
-  unsigned short size()
+  size_t size()
   {
-    auto elements_number = _size.load();
+    size_t elements_number = _size.load();
     if (elements_number > 0)
     {
       return elements_number;
@@ -39,7 +38,9 @@ public:
     }
   }
 
-  Atomic_queue() :
+  Atomic_queue(size_t exponenta_of_capacity = 8) :
+    _capacity(utils::two_to_the_power_of(exponenta_of_capacity)),
+    _queue(_capacity),
     _current_free_value_keeper(0),
     _current_first_value(0),
     _size(0) 
@@ -47,23 +48,23 @@ public:
 
   std::optional<Value_type> pop()
   {
-    auto prev_elements_number = _size.fetch_sub(1);
+    size_t prev_elements_number = _size.fetch_sub(1);
     if (prev_elements_number < 1)
     {
       _size.fetch_add(1);
       return std::nullopt;
     }
 
-    auto current_id = _current_first_value.fetch_add(1);
+    size_t current_id = _current_first_value.fetch_add(1) % _capacity;
 
     return _queue[current_id].read();
   }
 
 private:
-
-  std::array<RCU_cell_light<Value_type>, _capacity> _queue;
+  size_t _capacity;
+  std::vector<RCU_cell_light<Value_type>> _queue;
   std::atomic_ulong _current_free_value_keeper;
   std::atomic_ulong _current_first_value;
 
-  std::atomic_short _size;
+  std::atomic_int _size;
 };

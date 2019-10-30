@@ -7,6 +7,7 @@
 void Engine::send_explosion(const size_t x_coordinate, const size_t y_coordinate)
 {
   size_t thread_index = _threads_cyclic_index.fetch_add(1) % _threads.size();
+  // std::cout << "thread_index: " << thread_index << std::endl;
   _threads[thread_index]->_explosions.push({ static_cast<float>(x_coordinate), static_cast<float > (y_coordinate) });
 }
 
@@ -44,18 +45,22 @@ void Engine::thread_worker(Thread_data& thread_data)
     }
 
     thread_data.process_particles(delta_t_ms);
-
-    for (size_t i = 0; i < _max_explosions_pops_per_cycle; ++i)
+    
+    do
     {
-      particles_packs[i] = thread_data.make_pack_from_explosion(thread_data._explosions.pop());
-
-      if (!particles_packs[i])
+      for (size_t i = 0; i < _max_explosions_pops_per_cycle; ++i)
       {
-        break;
-      }
-    }
+        particles_packs[i] = thread_data.make_pack_from_explosion(thread_data._explosions.pop());
 
-    thread_data.add_particles(particles_packs);
+        if (!particles_packs[i])
+        {
+          break;
+        }
+      }
+
+      thread_data.add_particles(particles_packs);
+    } 
+    while (thread_data._explosions.size() > 3);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
@@ -105,17 +110,27 @@ size_t Engine::get_particles_number()
 
 std::string Engine::get_debug_data()
 {
-  size_t particles_number = get_particles_number();
+  std::string result = std::to_string(get_particles_number()) + "\n";
+
+  for (size_t i = 0; i < _threads.size(); ++i)
+  {
+    auto& thread = _threads[i];
+    result += "Thread: " + std::to_string(i);
+    result += ", explosion size: " + std::to_string(thread->_explosions.size());
+    result += ", particles size: " + std::to_string(thread->_particles.size());
+    result += ", empty number: " + std::to_string(thread->_particles.empty_number());
+    result += "\n";
+  }
 
 
-  return std::string();
+  return result;
 }
 
 Engine::Engine(size_t threads_number) : _is_stop(false)
 {
   if (threads_number == 0)
   {
-    threads_number = std::thread::hardware_concurrency();
+    threads_number = std::thread::hardware_concurrency() - 1;
   }
 
   if (threads_number == 0)
@@ -136,6 +151,8 @@ Engine::Engine(size_t threads_number) : _is_stop(false)
   {
     _threads.emplace_back(new Engine::Thread_data(*this, particles_number_per_thread, _parts_number_per_thread));
   }
+
+  _threads_cyclic_index.store(0);
 }
 
 void Engine::Thread_data::process_particles(const size_t delta_t_ms)
@@ -206,11 +223,13 @@ void Engine::Thread_data::add_particles(const Particles_packs_array& particles_p
     return;
   }
 
-  size_t mininmal_lifetime_border = 0;
+  size_t mininmal_lifetime_border = std::numeric_limits<size_t>::max();
   {
     int number_of_particles_to_replace = particles_number - _particles.size();
     if (number_of_particles_to_replace > 0)
     {
+      // std::cout << "number_of_particles_to_replace: " << number_of_particles_to_replace << std::endl;
+
       mininmal_lifetime_border =
           _particles_counter.
               get_minimal_lifetime_for_oldest_particles_number(number_of_particles_to_replace);
@@ -251,6 +270,8 @@ void Engine::Thread_data::add_particles(const Particles_packs_array& particles_p
 
 Engine::Thread_data::Thread_data(Engine& engine, size_t particles_number, size_t parts_number)
   : _engine(engine),
+    _explosions_from_user(static_cast<size_t>(std::log2(particles_number / 160)) + 1),
+    _explosions(static_cast<size_t>(std::log2(particles_number / 40)) + 1),
     _particles(particles_number, parts_number),
     _thread(&Engine::thread_worker, &engine, std::ref(*this))
 { }
@@ -291,6 +312,10 @@ size_t Engine::Particles_by_lifetime_counter::
   return 0;
 }
 
+Engine::Random_generator::Random_generator() :
+  _generator(_random_device())
+{ }
+
 bool Engine::Random_generator::get_random_bool_from_probability(double probability)
 {
   std::bernoulli_distribution distribution(probability);
@@ -300,6 +325,6 @@ bool Engine::Random_generator::get_random_bool_from_probability(double probabili
 float Engine::Random_generator::get_random_float_from_weibull(double scale)
 {
   std::bernoulli_distribution bernoulli_distribution(0.5);
-  std::weibull_distribution<float> weibull_distribution(2.0, scale);
+  std::weibull_distribution<float> weibull_distribution(2.5, scale);
   return (bernoulli_distribution(_generator) ? 1 : -1) * weibull_distribution(_generator);
 }

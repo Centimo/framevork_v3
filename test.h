@@ -2,6 +2,7 @@ namespace test
 {
 	const float SCREEN_WIDTH = 1024;
 	const float SCREEN_HEIGHT = 768;
+  const size_t time_period = 10;
 
   // extern std::unique_ptr<Engine> engine;
 

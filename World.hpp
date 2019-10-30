@@ -42,11 +42,11 @@ struct World
     }
   };
 
-  using Radius_vector = Vector<double>;
-  using Position_vector = Vector<size_t>;
+  using Radius_vector = Vector<float>;
+  using Position_vector = Vector<float>;
 
   constexpr static size_t _particles_pack_size = 64;
-  constexpr static Radius_vector _acceleration = { 0.0, -1.0 };
+  constexpr static Radius_vector _acceleration = { 0.0, 5.0 };
 
   struct Particle
   {
@@ -56,9 +56,10 @@ struct World
 
     Particle move(size_t delta_t_ms) const
     {
+      //double check = static_cast<double>(delta_t_ms) / 1000;
       return Particle{
-        _position + _velocity * static_cast<double>(delta_t_ms / 1000),
-        _velocity + _acceleration * static_cast<double>(delta_t_ms / 1000),
+        _position + _velocity * (static_cast<float>(delta_t_ms) / 1000),
+        _velocity + _acceleration * (static_cast<float>(delta_t_ms) / 1000),
         _lifetime + delta_t_ms
       };
     }
