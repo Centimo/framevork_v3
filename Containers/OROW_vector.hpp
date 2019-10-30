@@ -10,10 +10,7 @@
 #include <array>
 #include <variant>
 #include <functional>
-#include <iostream>
 #include <mutex>
-
-// #include "Atomic_meta.hpp"
 
 
 template <typename Value_type>
@@ -109,7 +106,6 @@ public:
           std::optional<Value_type> (const std::optional<std::reference_wrapper<const Value_type> >&)
       >& function)
   {
-    //std::lock_guard<std::mutex> lock(_sync);
     for (size_t part_index = 0; part_index < _parts.size(); ++part_index)
     {
       Part& part = _parts[part_index];

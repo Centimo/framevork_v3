@@ -19,9 +19,7 @@ static std::atomic<float> globalTime;
 static volatile bool workerMustExit = false;
 
 static std::unique_ptr<Engine> engine = nullptr;
-static std::vector<World<2>::Position_vector> global_particles;
 static std::atomic<size_t> render_counter;
-static size_t fps;
 
 
 void WorkerThread(void)
@@ -46,12 +44,10 @@ void WorkerThread(void)
 
     if (counter > 1000)
     {
-      fps = render_counter.load();
-      render_counter.store(0);
-
       // std::cout << engine->get_debug_data() << std::endl;
-      std::cout << "FPS: " << fps << std::endl;
+      std::cout << "FPS: " << render_counter.load() << std::endl;
 
+      render_counter.store(0);
       counter = 0;
     }
 

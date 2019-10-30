@@ -5,7 +5,7 @@
 #pragma once
 
 #include <atomic>
-#include <array>
+#include <vector>
 #include <optional>
 
 #include "utils.h"
