@@ -76,7 +76,6 @@ class Engine
     Thread_data& operator = (const Thread_data&) = default;
 
     void process_particles(size_t delta_t_ms);
-    // void add_particles(const Particles_packs_array& particles_packs);
     std::optional<Particles_pack> make_pack_from_explosion(const std::optional<World_t::Explosion>& explosion);
   };
 
