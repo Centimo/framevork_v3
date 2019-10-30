@@ -22,12 +22,6 @@ class OROW_vector
   constexpr static size_t _additional_ranges_number = 2;
 
 private:
-  struct Empty_element
-  {
-    size_t _next_empty_element;
-    size_t _previous_empty_element;
-  };
-
   struct Range
   {
     size_t _start_index;
@@ -92,7 +86,6 @@ public:
 
   void call_function_for_all_nonempty_elements(const std::function<void (const Value_type&)>& function) const
   {
-    //std::lock_guard<std::mutex> lock(_sync);
     for (const Part& part : _parts)
     {
       size_t range_index = part._range_index.load();
@@ -130,20 +123,12 @@ public:
 
       for (size_t element_index = 0; element_index < part._elements_number; ++element_index)
       {
-        if (_free_ranges[free_range_index] == _reading_range.load())
-        {
-          std::cout << "Bang!" << std::endl;
-        }
-
         std::optional<Value_type> result;
-
-        // std::cout << "next_empty_element: " << next_empty_element << std::endl;
 
         auto& current_value = _elements[source_range._start_index + element_index];
         if (current_value)
         {
           result = function(current_value, is_stop);
-          // std::cout << "next_empty_element: " << next_empty_element << std::endl;
 
           if (!result)
           {
@@ -200,8 +185,6 @@ private:
   std::vector<std::optional<Value_type> > _elements;
   std::vector<Part> _parts;
   std::array<size_t, _additional_ranges_number> _free_ranges;
-  volatile mutable std::atomic<size_t> _reading_range;
-  volatile std::atomic<size_t> _empty_elements_number;
-
-  //mutable std::mutex _sync;
+  mutable std::atomic<size_t> _reading_range;
+  std::atomic<size_t> _empty_elements_number;
 };

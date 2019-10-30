@@ -31,34 +31,19 @@ class RCU_cell_light
       _value = source._value;
       return *this;
     }
-
-    /*
-    RCU_cell_light& operator = (const RCU_cell_light& source_cell)
-    {
-      _read_cell_pointer_id.store(0);
-      _is_writing_state.clear();
-      _elements.fill(Cell{ 0, false, source_cell.read() });
-    }
-    */
   };
 
   static constexpr size_t _copies_number = 2;
 
 private:
-  void write_to_cell(size_t index, const Value_type& value, std::atomic<size_t>* _wait_counter = nullptr)
+  void write_to_cell(size_t index, const Value_type& value)
   {
     Cell& current_write_reference = _elements[index % _copies_number];
     current_write_reference._is_writing.store(true);
 
     while (current_write_reference._readers_counter.load() != 0)
     {
-
-      //std::this_thread::yield();
       std::this_thread::sleep_for(std::chrono::microseconds(writing_cell_sleep_mcs));
-      if (_wait_counter)
-      {
-        _wait_counter->fetch_add(1);
-      }
     }
 
     current_write_reference._value = value;
@@ -102,7 +87,7 @@ public:
     }
   }
 
-  void write(const Value_type& value, std::atomic<size_t>* _wait_counter = nullptr)
+  void write(const Value_type& value)
   {
     while (_is_writing_state.test_and_set(std::memory_order::memory_order_relaxed))
     {
@@ -111,7 +96,7 @@ public:
 
     auto read_pointer_index = _read_cell_pointer_id.load();
 
-    write_to_cell(read_pointer_index + 1, value, _wait_counter);
+    write_to_cell(read_pointer_index + 1, value);
 
     ++_read_cell_pointer_id;
 

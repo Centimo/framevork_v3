@@ -26,9 +26,10 @@ class Engine
   constexpr static size_t _total_particles_number = 2048 * World_t::_particles_pack_size;
   constexpr static size_t _parts_number_per_thread = 64;
   constexpr static size_t _max_explosions_pops_per_cycle = 5;
-  constexpr static double _probability_of_disappearing = 0.02;
-  constexpr static double _probability_of_exploding = 0.003;
-  constexpr static double _scale_for_weibull = 80.0;
+  constexpr static size_t _max_cycles_for_explosions_receiving = 5;
+  constexpr static double _probability_of_disappearing = 0.0002;
+  constexpr static double _probability_of_exploding = 0.000008;
+  constexpr static double _scale_for_weibull = 80.0; // random speed scale
 
 
   using Particles_packs_array = std::array< std::optional<World_t::Particles_pack>, _max_explosions_pops_per_cycle>;
@@ -78,14 +79,16 @@ class Engine
 public:
 
   Engine(size_t threads_number = 0);
-
-  void send_explosion(size_t x_coordinate, size_t y_coordinate);
-  void call_function_for_all_particles(const std::function<void (size_t, size_t)>& function) const;
+  ~Engine();
+  void send_user_explosion(size_t x_coordinate, size_t y_coordinate);
+  
+  void call_function_for_all_particles(const std::function<void (size_t, size_t, size_t)>& function) const;
   void update_global_time(size_t delta_t_ms);
   size_t get_particles_number();
   std::string get_debug_data();
 
 private:
+  void send_explosion(size_t x_coordinate, size_t y_coordinate);
   void thread_worker(Thread_data& thread_data);
 
 private:

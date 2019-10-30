@@ -60,8 +60,10 @@ public:
     return _queue[current_id].read();
   }
 
+public:
+  const size_t _capacity;
+
 private:
-  size_t _capacity;
   std::vector<RCU_cell_light<Value_type>> _queue;
   std::atomic_ulong _current_free_value_keeper;
   std::atomic_ulong _current_first_value;

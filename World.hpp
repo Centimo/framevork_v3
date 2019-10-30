@@ -26,6 +26,16 @@ struct World
       return result;
     };
 
+    Vector& operator * (const Value_type& multiplier)
+    {
+      for (size_t i = 0; i < dimensions_number; ++i)
+      {
+        (*this)[i] *= multiplier;
+      }
+
+      return *this;
+    };
+
     template <typename Second_value_type>
     friend Vector
       operator + (
@@ -40,13 +50,25 @@ struct World
 
       return result;
     }
+
+    template <typename Second_value_type>
+    Vector operator + (const Vector<Second_value_type>& second_term)
+    {
+      for (size_t i = 0; i < dimensions_number; ++i)
+      {
+        (*this)[i] += second_term[i];
+      }
+
+      return *this;
+    }
   };
 
   using Radius_vector = Vector<float>;
   using Position_vector = Vector<float>;
 
   constexpr static size_t _particles_pack_size = 64;
-  constexpr static Radius_vector _acceleration = { 0.0, 5.0 };
+  constexpr static float _acceleration_scale = 0.9;
+  constexpr static Radius_vector _acceleration = { 0.0, 10.0 }; // for y - is up, + is down
 
   struct Particle
   {
@@ -56,10 +78,11 @@ struct World
 
     Particle move(size_t delta_t_ms) const
     {
-      //double check = static_cast<double>(delta_t_ms) / 1000;
+      float delta_t_s = static_cast<float>(delta_t_ms) / 1000;
+
       return Particle{
-        _position + _velocity * (static_cast<float>(delta_t_ms) / 1000),
-        _velocity + _acceleration * (static_cast<float>(delta_t_ms) / 1000),
+        _position + _velocity * delta_t_s,
+        (_velocity + _acceleration * delta_t_s) * std::pow(_acceleration_scale, delta_t_s),
         _lifetime + delta_t_ms
       };
     }

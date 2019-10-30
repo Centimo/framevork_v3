@@ -7,11 +7,16 @@
 void Engine::send_explosion(const size_t x_coordinate, const size_t y_coordinate)
 {
   size_t thread_index = _threads_cyclic_index.fetch_add(1) % _threads.size();
-  // std::cout << "thread_index: " << thread_index << std::endl;
   _threads[thread_index]->_explosions.push({ static_cast<float>(x_coordinate), static_cast<float > (y_coordinate) });
 }
 
-void Engine::call_function_for_all_particles(const std::function<void(size_t, size_t)>& function) const
+void Engine::send_user_explosion(const size_t x_coordinate, const size_t y_coordinate)
+{
+  size_t thread_index = _threads_cyclic_index.fetch_add(1) % _threads.size();
+  _threads[thread_index]->_explosions_from_user.push({ static_cast<float>(x_coordinate), static_cast<float> (y_coordinate) });
+}
+
+void Engine::call_function_for_all_particles(const std::function<void(size_t, size_t, size_t)>& function) const
 {
   for (const auto& thread : _threads)
   {
@@ -19,7 +24,7 @@ void Engine::call_function_for_all_particles(const std::function<void(size_t, si
       call_function_for_all_nonempty_elements(
         [&function] (const World_t::Particle& particle)
         {
-          function(particle._position[0], particle._position[1]);
+          function(particle._position[0], particle._position[1], particle._lifetime);
         });
   }
 }
@@ -31,7 +36,6 @@ void Engine::thread_worker(Thread_data& thread_data)
 
   while (!_is_stop.load())
   {
-    // TODO: test
     long long delta_t_ms = _current_global_time_ms.load() - current_global_time_ms;
     if (delta_t_ms < 0)
     {
@@ -46,23 +50,36 @@ void Engine::thread_worker(Thread_data& thread_data)
 
     thread_data.process_particles(delta_t_ms);
     
-    do
-    {
-      for (size_t i = 0; i < _max_explosions_pops_per_cycle; ++i)
-      {
-        particles_packs[i] = thread_data.make_pack_from_explosion(thread_data._explosions.pop());
 
-        if (!particles_packs[i])
+    while (thread_data._explosions_from_user.size())
+    {
+      for (size_t pops_counter = 0; pops_counter < _max_explosions_pops_per_cycle; ++pops_counter)
+      {
+        particles_packs[pops_counter] = thread_data.make_pack_from_explosion(thread_data._explosions_from_user.pop());
+
+        if (!particles_packs[pops_counter])
         {
           break;
         }
       }
 
       thread_data.add_particles(particles_packs);
-    } 
-    while (thread_data._explosions.size() > 3);
+    }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    for (size_t i = 0; i < _max_cycles_for_explosions_receiving && thread_data._explosions.size() > 0; ++i)
+    {
+      for (size_t pops_counter = 0; pops_counter < _max_explosions_pops_per_cycle; ++pops_counter)
+      {
+        particles_packs[pops_counter] = thread_data.make_pack_from_explosion(thread_data._explosions.pop());
+
+        if (!particles_packs[pops_counter])
+        {
+          break;
+        }
+      }
+
+      thread_data.add_particles(particles_packs);
+    }
 
     current_global_time_ms = _current_global_time_ms.load();
   }
@@ -155,6 +172,19 @@ Engine::Engine(size_t threads_number) : _is_stop(false)
   _threads_cyclic_index.store(0);
 }
 
+
+Engine::~Engine()
+{
+  _is_stop.store(true);
+  for (auto& thread : _threads)
+  {
+    if (thread->_thread.joinable())
+    {
+      thread->_thread.join();
+    }
+  }
+}
+
 void Engine::Thread_data::process_particles(const size_t delta_t_ms)
 {
   if (_particles.is_empty())
@@ -178,11 +208,11 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
         const World_t::Particle& particle = particle_optional.value();
 
 
-        if (_random_generator.get_random_bool_from_probability(_probability_of_disappearing))
+        if (_random_generator.get_random_bool_from_probability(_probability_of_disappearing * delta_t_ms))
         {
           return std::nullopt;
         }
-        else if (_random_generator.get_random_bool_from_probability(_probability_of_exploding))
+        else if (_random_generator.get_random_bool_from_probability(_probability_of_exploding * delta_t_ms))
         {
           _engine.send_explosion(particle._position[0], particle._position[1]);
           return std::nullopt;
