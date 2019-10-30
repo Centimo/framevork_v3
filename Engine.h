@@ -11,10 +11,8 @@
 #include <string>
 
 #include "Atomic_queue.hpp"
-#include "Lock_queue.hpp"
-#include "Lock_vector.hpp"
 #include "World.hpp"
-#include "OROW_vector_copy_2.hpp"
+#include "OROW_vector.hpp"
 
 
 class Engine
@@ -23,7 +21,10 @@ class Engine
 
   using World_t = World<_dimensions_number>;
 
-  constexpr static size_t _total_particles_number = 2048 * World_t::_particles_pack_size;
+  constexpr static size_t _particles_pack_size = 64;
+  using Particles_pack = std::array<World_t::Particle, _particles_pack_size>;
+
+  constexpr static size_t _total_particles_number = 2048 * _particles_pack_size;
   constexpr static size_t _parts_number_per_thread = 64;
   constexpr static size_t _max_explosions_pops_per_cycle = 5;
   constexpr static size_t _max_cycles_for_explosions_receiving = 5;
@@ -32,7 +33,7 @@ class Engine
   constexpr static double _scale_for_weibull = 80.0; // random speed scale
 
 
-  using Particles_packs_array = std::array< std::optional<World_t::Particles_pack>, _max_explosions_pops_per_cycle>;
+  using Particles_packs_array = std::array< std::optional<Particles_pack>, _max_explosions_pops_per_cycle>;
 
   class Particles_by_lifetime_counter
   {
@@ -73,17 +74,18 @@ class Engine
 
     void process_particles(size_t delta_t_ms);
     void add_particles(const Particles_packs_array& particles_packs);
-    std::optional<World_t::Particles_pack> make_pack_from_explosion(const std::optional<World_t::Explosion>& explosion);
+    std::optional<Particles_pack> make_pack_from_explosion(const std::optional<World_t::Explosion>& explosion);
   };
 
 public:
 
-  Engine(size_t threads_number = 0);
+  Engine(const World_t::Position_vector& borders, size_t threads_number = 0);
   ~Engine();
+
   void send_user_explosion(size_t x_coordinate, size_t y_coordinate);
-  
   void call_function_for_all_particles(const std::function<void (size_t, size_t, size_t)>& function) const;
   void update_global_time(size_t delta_t_ms);
+  void change_borders(const World_t::Position_vector& new_borders);
   size_t get_particles_number();
   std::string get_debug_data();
 
@@ -97,6 +99,7 @@ private:
 
   std::atomic<bool> _is_stop;
   std::atomic<size_t> _current_global_time_ms;
+  std::array<std::atomic<float>, _dimensions_number> _borders;
 };
 
 

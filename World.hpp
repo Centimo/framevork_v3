@@ -66,7 +66,6 @@ struct World
   using Radius_vector = Vector<float>;
   using Position_vector = Vector<float>;
 
-  constexpr static size_t _particles_pack_size = 64;
   constexpr static float _acceleration_scale = 0.9;
   constexpr static Radius_vector _acceleration = { 0.0, 10.0 }; // for y - is up, + is down
 
@@ -88,7 +87,5 @@ struct World
     }
   };
 
-
-  using Particles_pack = std::array<Particle, _particles_pack_size>;
   using Explosion = Position_vector;
 };

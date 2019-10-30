@@ -65,7 +65,7 @@ void WorkerThread(void)
 
 void test::init(void)
 {
-  engine.reset(new Engine());
+  engine.reset(new Engine({ test::SCREEN_WIDTH, test::SCREEN_HEIGHT }));
 
 	std::thread workerThread(WorkerThread);
 	workerThread.detach(); // Glut + MSVC = join hangs in atexit()
@@ -87,10 +87,10 @@ void test::render(void)
       platform::drawPoint(
         static_cast<float>(x_coordinate), 
         static_cast<float>(SCREEN_HEIGHT - y_ccordinate), 
-        1.0 - 0.6 * std::log10(lifetime_ms / 100) / (1 + std::log10(lifetime_ms / 100)),
-        0.2 + 0.2 * std::log10(lifetime_ms / 100) / (1 + std::log10(lifetime_ms / 100)),
-        0.0 + 0.4 * std::log10(lifetime_ms / 100) / (1 + std::log10(lifetime_ms / 100)),
-        1.0 - 0.4 * std::log10(lifetime_ms / 100) / (1 + std::log10(lifetime_ms / 100)));
+        1.0f - 0.6f * std::log10f(lifetime_ms / 100) / (1 + std::log10f(lifetime_ms / 100)),
+        0.2f + 0.2f * std::log10f(lifetime_ms / 100) / (1 + std::log10f(lifetime_ms / 100)),
+        0.0f + 0.4f * std::log10f(lifetime_ms / 100) / (1 + std::log10f(lifetime_ms / 100)),
+        1.0f - 0.4f * std::log10f(lifetime_ms / 100) / (1 + std::log10f(lifetime_ms / 100)));
     }
   );
 }

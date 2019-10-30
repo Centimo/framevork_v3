@@ -32,7 +32,7 @@ void Engine::call_function_for_all_particles(const std::function<void(size_t, si
 void Engine::thread_worker(Thread_data& thread_data)
 {
   size_t current_global_time_ms = 0;
-  std::array< std::optional< World_t::Particles_pack >, _max_explosions_pops_per_cycle> particles_packs;
+  std::array< std::optional< Particles_pack>, _max_explosions_pops_per_cycle> particles_packs;
 
   while (!_is_stop.load())
   {
@@ -85,7 +85,7 @@ void Engine::thread_worker(Thread_data& thread_data)
   }
 }
 
-std::optional<Engine::World_t::Particles_pack>
+std::optional<Engine::Particles_pack>
     Engine::Thread_data::make_pack_from_explosion(const std::optional<World_t::Explosion>& explosion)
 {
   if (!explosion)
@@ -93,7 +93,7 @@ std::optional<Engine::World_t::Particles_pack>
     return std::nullopt;
   }
 
-  World_t::Particles_pack result;
+  Particles_pack result;
 
   for (World_t::Particle& particle : result)
   {
@@ -112,6 +112,14 @@ std::optional<Engine::World_t::Particles_pack>
 void Engine::update_global_time(size_t delta_t_ms)
 {
   _current_global_time_ms.fetch_add(delta_t_ms);
+}
+
+void Engine::change_borders(const World_t::Position_vector& new_borders)
+{
+  for (size_t i = 0; i < _dimensions_number; ++i)
+  {
+    _borders[i].store(new_borders[i]);
+  }
 }
 
 size_t Engine::get_particles_number()
@@ -143,8 +151,11 @@ std::string Engine::get_debug_data()
   return result;
 }
 
-Engine::Engine(size_t threads_number) : _is_stop(false)
+Engine::Engine(const World_t::Position_vector& borders, size_t threads_number) : 
+  _is_stop(false)
 {
+  change_borders(borders);
+
   if (threads_number == 0)
   {
     threads_number = std::thread::hardware_concurrency() - 1;
@@ -220,11 +231,13 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
         else
         {
           auto result = particle.move(delta_t_ms);
-
-          if (result._position[0] < 0.0 || result._position[0] > 1024.0
-              || result._position[1] < 0.0 || result._position[1] > 768.0)
+          
+          for (size_t i = 0; i < _dimensions_number; ++i)
           {
-            return std::nullopt;
+            if (result._position[i] < 0.0 || result._position[i] > _engine._borders[i].load())
+            {
+              return std::nullopt;
+            }
           }
 
           _particles_counter.add_particle(result._lifetime);
@@ -240,7 +253,7 @@ void Engine::Thread_data::add_particles(const Particles_packs_array& particles_p
   {
     if (pack)
     {
-      particles_number += World_t::_particles_pack_size;
+      particles_number += _particles_pack_size;
     }
     else
     {
@@ -258,8 +271,6 @@ void Engine::Thread_data::add_particles(const Particles_packs_array& particles_p
     int number_of_particles_to_replace = particles_number - _particles.size();
     if (number_of_particles_to_replace > 0)
     {
-      // std::cout << "number_of_particles_to_replace: " << number_of_particles_to_replace << std::endl;
-
       mininmal_lifetime_border =
           _particles_counter.
               get_minimal_lifetime_for_oldest_particles_number(number_of_particles_to_replace);
@@ -282,8 +293,8 @@ void Engine::Thread_data::add_particles(const Particles_packs_array& particles_p
 
         const auto& result =
             particles_packs
-              [(particles_number - 1) / World_t::_particles_pack_size].value()
-                [(particles_number - 1) % World_t::_particles_pack_size];
+              [(particles_number - 1) / _particles_pack_size].value()
+                [(particles_number - 1) % _particles_pack_size];
 
         if (!particle_optional
             || particle_optional.value().get()._lifetime >=  mininmal_lifetime_border)

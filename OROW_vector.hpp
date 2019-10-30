@@ -10,146 +10,181 @@
 #include <array>
 #include <variant>
 #include <functional>
+#include <iostream>
+#include <mutex>
 
-#include "Atomic_meta.hpp"
+// #include "Atomic_meta.hpp"
 
 
 template <typename Value_type>
 class OROW_vector
 {
+  constexpr static size_t _additional_ranges_number = 2;
+
 private:
-  struct Empty_element
-  {
-    size_t _next_empty_element;
-    size_t _previous_empty_element;
-  };
-
-  enum Part_state
-  {
-    FREE,
-    READING,
-    WRITING,
-    READING_AND_WRITING
-  };
-
-  enum Copy_used
-  {
-    NONE,
-    FIRST,
-    SECOND
-  };
-
   struct Range
   {
     size_t _start_index;
-    size_t _end_index; // [_start_index; _end_index)
 
-    mutable std::atomic<Part_state> _state;
-    mutable std::atomic<Copy_used> _copy_used;
+    static std::vector<Range> make_vector_of_ranges(size_t size, size_t ranges_size)
+    {
+      std::vector<Range> result(size);
+
+      for (size_t i = 0; i < size; ++i)
+      {
+        result[i] = { i * ranges_size };
+      }
+
+      return result;
+    }
+  };
+
+  struct Part
+  {
+    mutable std::atomic<size_t> _range_index;
+    size_t _elements_number;
+
+    Part(const Part& source)
+      : _range_index(source._range_index.load()),
+        _elements_number(source._elements_number)
+    { }
+
+    Part(const size_t range_index, 
+         const size_t elements_number)
+
+      : _range_index(range_index),
+        _elements_number(elements_number)
+    { }
+
+    static std::vector<Part> make_vector_of_parts(size_t size, size_t ranges_size)
+    {
+      std::vector<Part> result(size, Part(0, ranges_size));
+
+      for (size_t i = 0; i < size; ++i)
+      {
+        result[i]._range_index.store(i);
+      }
+
+      return result;
+    }
   };
 
 private:
-  void update_from_copy(const Range& range)
-  {
-    auto destination = _elements.begin();
-    std::advance(destination, range._start_index);
-
-    std::copy_n(
-        _copies[range._copy_used.load()].begin(),
-        range._end_index - range._start_index,
-        destination);
-  }
 
 public:
   OROW_vector(size_t size, size_t parts_number)
-    : _elements(size, Empty_element{}),
-      _parts(parts_number),
-      _first_free_elements_of_parts(parts_number, 0)
+      : _ranges_size(size / parts_number + 1),
+        _ranges(Range::make_vector_of_ranges(parts_number + _additional_ranges_number, _ranges_size)),
+        _parts(Part::make_vector_of_parts(parts_number, _ranges_size)),
+        _free_ranges({parts_number, parts_number + 1}),
+        _reading_range(0)
   {
-    size_t part_size = size / parts_number;
-    size_t number_of_parts_with_additional_element = size % parts_number;
-
-    for (size_t i = 0, previous_end = 0; i < _parts.size(); ++i)
-    {
-      size_t next_start_index = previous_end + part_size + (i < number_of_parts_with_additional_element ? 1 : 0);
-      _parts[i] = { previous_end, next_start_index };
-      previous_end = next_start_index;
-    }
-
-    _copies[0].reserve(part_size + 1);
-    _copies[1].reserve(part_size + 1);
+    _parts.back()._elements_number = size - (parts_number - 1) * _ranges_size;
+    _elements.assign(_ranges_size * _ranges.size(), std::nullopt);
+    _empty_elements_number.store(_elements.size());
   }
 
   void call_function_for_all_nonempty_elements(const std::function<void (const Value_type&)>& function) const
   {
-    for (const Range& part : _parts)
+    for (const Part& part : _parts)
     {
-      using namespace Atomic_meta;
+      size_t range_index = part._range_index.load();
+      _reading_range.store(range_index);
+      const Range& range = _ranges[range_index];
 
-      Part_state previous_state =
-          compare(part._state).
-            template _and_swap_with_one_of<
-                         Change<Part_state::FREE>::template To<Part_state::WRITING>,
-                         Change<Part_state::WRITING>::template To<Part_state::READING_AND_WRITING>
-                     >();
-
-      for (size_t i = part._start_index; i < part._end_index; ++i)
+      for (size_t i = range._start_index; i < range._start_index + part._elements_number; ++i)
       {
-        if (auto value_pointer = std::get_if<Value_type>(&_elements[i]))
+        if (auto value = _elements[i])
         {
-          function(*value_pointer);
+          function(value.value());
         }
       }
 
-      previous_state =
-          compare(part._state).
-              template _and_swap_with_one_of<
-                           Change<Part_state::READING_AND_WRITING>::template To<Part_state::WRITING>,
-                           Change<Part_state::READING>::template To<Part_state::FREE>
-                       >();
-
-      if (previous_state == Part_state::READING && part._copy_used.load() != Copy_used::NONE)
-      {
-        update_from_copy(part);
-
-        part._copy_used.store(Copy_used::NONE);
-      }
+      _reading_range.store(-1);
     }
   }
 
   void call_function_for_all_elements(
-         const std::function<
-                     std::optional<Value_type> (const std::optional<std::reference_wrapper<const Value_type> >&)
-               >& function)
+      const std::function<
+          std::optional<Value_type> (const std::optional<std::reference_wrapper<const Value_type> >&, bool&)
+      >& function)
   {
-    using namespace Atomic_meta;
-
-    for (const Range& part : _parts)
+    //std::lock_guard<std::mutex> lock(_sync);
+    for (size_t part_index = 0; part_index < _parts.size(); ++part_index)
     {
-      Part_state previous_state =
-          compare(part._state).
-              template _and_swap_with_one_of<
-                           Change<Part_state::FREE>::template To<Part_state::WRITING>,
-                           Change<Part_state::WRITING>::template To<Part_state::READING_AND_WRITING>
-                       >();
+      bool is_stop = false;
+      Part& part = _parts[part_index];
+      const size_t free_range_index = (_free_ranges[0] != _reading_range.load()) ? 0 : 1;
+      const size_t destination_range_index = _free_ranges[free_range_index];
 
-      for (size_t i = part._start_index; i < part._end_index; ++i)
+      const Range& destination_range = _ranges[destination_range_index];
+      const size_t source_range_index = part._range_index.load();
+      const Range& source_range = _ranges[source_range_index];
+
+      for (size_t element_index = 0; element_index < part._elements_number; ++element_index)
       {
-        auto value_pointer = std::get_if<Value_type>(&_elements[i]);
-        std::optional<Value_type> result = value_pointer ? function(*value_pointer) : function(std::nullopt);
+        std::optional<Value_type> result;
 
-        if (!result)
+        auto& current_value = _elements[source_range._start_index + element_index];
+        if (current_value)
         {
-          continue;
+          result = function(current_value, is_stop);
+
+          if (!result)
+          {
+            _empty_elements_number.fetch_add(1);
+          }
         }
+        else
+        {
+          result = function(std::nullopt, is_stop);
+
+          if (result)
+          {
+            _empty_elements_number.fetch_sub(1);
+          }
+        }
+
+        _elements[destination_range._start_index + element_index] = result;
+
+        if (is_stop)
+        {
+          break;
+        }
+      }
+
+      part._range_index.store(destination_range_index);
+      _free_ranges[free_range_index] = source_range_index;
+
+      if (is_stop)
+      {
+        return;
       }
     }
   }
 
-private:
-  std::vector<std::variant<Empty_element, Value_type> > _elements;
+  size_t size() const
+  {
+    return _elements.size() - _empty_elements_number.load();
+  }
 
-  std::vector<Range> _parts;
-  std::vector<size_t> _first_free_elements_of_parts;
-  mutable std::array<std::vector<std::variant<Empty_element, Value_type>>, 2> _copies;
+  bool is_empty() const
+  {
+    return _elements.size() == _empty_elements_number.load();
+  }
+
+  size_t empty_number() const
+  {
+    return _empty_elements_number.load();
+  }
+
+private:
+  const size_t _ranges_size;
+  const std::vector<Range> _ranges;
+
+  std::vector<std::optional<Value_type> > _elements;
+  std::vector<Part> _parts;
+  std::array<size_t, _additional_ranges_number> _free_ranges;
+  mutable std::atomic<size_t> _reading_range;
+  std::atomic<size_t> _empty_elements_number;
 };
