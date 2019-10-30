@@ -17,14 +17,17 @@
 class Engine
 {
   constexpr static size_t _dimensions_number = 2;
-  constexpr static size_t _total_particles_number = 2048 * 64;
-  constexpr static size_t _parts_number_per_thread = 32;
-  constexpr static size_t _max_explosions_pops_per_cycle = 3;
-  constexpr static double _probability_of_disappearing = 0.2;
-  constexpr static double _probability_of_exploding = 0.1;
-  constexpr static double _scale_for_weibull = 2.0;
 
   using World_t = World<_dimensions_number>;
+
+  constexpr static size_t _total_particles_number = 64 * World_t::_particles_pack_size;
+  constexpr static size_t _parts_number_per_thread = 8;
+  constexpr static size_t _max_explosions_pops_per_cycle = 5;
+  constexpr static double _probability_of_disappearing = 0.2;
+  constexpr static double _probability_of_exploding = 0.1;
+  constexpr static double _scale_for_weibull = 20.0;
+
+
   using Particles_packs_array = std::array< std::optional<World_t::Particles_pack>, _max_explosions_pops_per_cycle>;
 
   class Particles_by_lifetime_counter
@@ -44,7 +47,7 @@ class Engine
 
   public:
     bool get_random_bool_from_probability(double probability);
-    double get_random_double_from_weibull(double scale);
+    float get_random_float_from_weibull(double scale);
   };
 
   struct Thread_data
@@ -72,6 +75,8 @@ public:
   void send_explosion(size_t x_coordinate, size_t y_coordinate);
   void call_function_for_all_particles(const std::function<void (size_t, size_t)>& function) const;
   void update_global_time(size_t delta_t_ms);
+  size_t get_particles_number();
+  std::string get_debug_data();
 
 private:
   void thread_worker(Thread_data& thread_data);
