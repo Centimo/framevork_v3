@@ -46,40 +46,32 @@ void Engine::thread_worker(Thread_data& thread_data)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
       continue;
+    }  
+
+    size_t explosions_buffer_iterator = 0;
+    for (; explosions_buffer_iterator < thread_data._explosions_buffer.size(); ++explosions_buffer_iterator)
+    {
+      thread_data._explosions_buffer[explosions_buffer_iterator] = 
+        thread_data.make_pack_from_explosion(thread_data._explosions_from_user.pop());
+
+      if (!thread_data._explosions_buffer[explosions_buffer_iterator])
+      {
+        break;
+      }
+    }
+
+    for (; explosions_buffer_iterator < thread_data._explosions_buffer.size(); ++explosions_buffer_iterator)
+    {
+      thread_data._explosions_buffer[explosions_buffer_iterator] =
+        thread_data.make_pack_from_explosion(thread_data._explosions.pop());
+
+      if (!thread_data._explosions_buffer[explosions_buffer_iterator])
+      {
+        break;
+      }
     }
 
     thread_data.process_particles(delta_t_ms);
-    
-
-    while (thread_data._explosions_from_user.size())
-    {
-      for (size_t pops_counter = 0; pops_counter < _max_explosions_pops_per_cycle; ++pops_counter)
-      {
-        particles_packs[pops_counter] = thread_data.make_pack_from_explosion(thread_data._explosions_from_user.pop());
-
-        if (!particles_packs[pops_counter])
-        {
-          break;
-        }
-      }
-
-      thread_data.add_particles(particles_packs);
-    }
-
-    for (size_t i = 0; i < _max_cycles_for_explosions_receiving && thread_data._explosions.size() > 0; ++i)
-    {
-      for (size_t pops_counter = 0; pops_counter < _max_explosions_pops_per_cycle; ++pops_counter)
-      {
-        particles_packs[pops_counter] = thread_data.make_pack_from_explosion(thread_data._explosions.pop());
-
-        if (!particles_packs[pops_counter])
-        {
-          break;
-        }
-      }
-
-      thread_data.add_particles(particles_packs);
-    }
 
     current_global_time_ms = _current_global_time_ms.load();
   }
@@ -198,26 +190,63 @@ Engine::~Engine()
 
 void Engine::Thread_data::process_particles(const size_t delta_t_ms)
 {
-  if (_particles.is_empty())
+  size_t particles_number = 0;
+  for (const auto& pack : _explosions_buffer)
+  {
+    if (pack)
+    {
+      particles_number += _particles_pack_size;
+    }
+    else
+    {
+      break;
+    }
+  }
+
+  if (!particles_number && _particles.is_empty())
   {
     return;
   }
 
+  size_t mininmal_lifetime_border = std::numeric_limits<size_t>::max();
+  {
+    int number_of_particles_to_replace = particles_number - _particles.size();
+    if (number_of_particles_to_replace > 0)
+    {
+      mininmal_lifetime_border =
+        _particles_counter.
+          get_minimal_lifetime_for_oldest_particles_number(number_of_particles_to_replace);
+    }
+  }
+
   _particles.call_function_for_all_elements(
-      [this, &delta_t_ms]
+      [this, delta_t_ms, &particles_number, mininmal_lifetime_border]
         (
-          const std::optional<std::reference_wrapper<const World_t::Particle> >& particle_optional,
-          bool& is_stop
+          const std::optional<std::reference_wrapper<const World_t::Particle> >& particle_optional
         )
         -> std::optional<World_t::Particle>
       {
-        if (!particle_optional)
+        if (!particle_optional && !particles_number)
         {
           return std::nullopt;
         }
 
-        const World_t::Particle& particle = particle_optional.value();
+        if (particles_number)
+        {
+          const auto& result =
+            _explosions_buffer
+              [(particles_number - 1) / _particles_pack_size].value()
+              [(particles_number - 1) % _particles_pack_size];
 
+          if (!particle_optional
+            || particle_optional.value().get()._lifetime >= mininmal_lifetime_border)
+          {
+            --particles_number;
+            return result;
+          }
+        }
+
+        const World_t::Particle& particle = particle_optional.value();
 
         if (_random_generator.get_random_bool_from_probability(_probability_of_disappearing * delta_t_ms))
         {
@@ -246,6 +275,7 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
       });
 }
 
+/*
 void Engine::Thread_data::add_particles(const Particles_packs_array& particles_packs)
 {
   size_t particles_number = 0;
@@ -308,11 +338,13 @@ void Engine::Thread_data::add_particles(const Particles_packs_array& particles_p
         }
       });
 }
+*/
 
 Engine::Thread_data::Thread_data(Engine& engine, size_t particles_number, size_t parts_number)
   : _engine(engine),
     _explosions_from_user(static_cast<size_t>(std::log2(particles_number / 160)) + 1),
     _explosions(static_cast<size_t>(std::log2(particles_number / 40)) + 1),
+    _explosions_buffer(_explosions_buffer_size),
     _particles(particles_number, parts_number),
     _thread(&Engine::thread_worker, &engine, std::ref(*this))
 { }

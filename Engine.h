@@ -28,6 +28,7 @@ class Engine
   constexpr static size_t _parts_number_per_thread = 64;
   constexpr static size_t _max_explosions_pops_per_cycle = 5;
   constexpr static size_t _max_cycles_for_explosions_receiving = 5;
+  constexpr static size_t _explosions_buffer_size = 40;
   constexpr static double _probability_of_disappearing = 0.0002;
   constexpr static double _probability_of_exploding = 0.000008;
   constexpr static double _scale_for_weibull = 80.0; // random speed scale
@@ -67,13 +68,15 @@ class Engine
     Particles_by_lifetime_counter _particles_counter;
     Random_generator _random_generator;
 
+    std::vector< std::optional< Particles_pack> > _explosions_buffer;
+
     std::thread _thread;
 
     Thread_data(Engine& engine, size_t particles_number, size_t parts_number);
     Thread_data& operator = (const Thread_data&) = default;
 
     void process_particles(size_t delta_t_ms);
-    void add_particles(const Particles_packs_array& particles_packs);
+    // void add_particles(const Particles_packs_array& particles_packs);
     std::optional<Particles_pack> make_pack_from_explosion(const std::optional<World_t::Explosion>& explosion);
   };
 

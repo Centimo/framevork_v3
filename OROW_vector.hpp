@@ -106,13 +106,12 @@ public:
 
   void call_function_for_all_elements(
       const std::function<
-          std::optional<Value_type> (const std::optional<std::reference_wrapper<const Value_type> >&, bool&)
+          std::optional<Value_type> (const std::optional<std::reference_wrapper<const Value_type> >&)
       >& function)
   {
     //std::lock_guard<std::mutex> lock(_sync);
     for (size_t part_index = 0; part_index < _parts.size(); ++part_index)
     {
-      bool is_stop = false;
       Part& part = _parts[part_index];
       const size_t free_range_index = (_free_ranges[0] != _reading_range.load()) ? 0 : 1;
       const size_t destination_range_index = _free_ranges[free_range_index];
@@ -128,7 +127,7 @@ public:
         auto& current_value = _elements[source_range._start_index + element_index];
         if (current_value)
         {
-          result = function(current_value, is_stop);
+          result = function(current_value);
 
           if (!result)
           {
@@ -137,7 +136,7 @@ public:
         }
         else
         {
-          result = function(std::nullopt, is_stop);
+          result = function(std::nullopt);
 
           if (result)
           {
@@ -146,20 +145,10 @@ public:
         }
 
         _elements[destination_range._start_index + element_index] = result;
-
-        if (is_stop)
-        {
-          break;
-        }
       }
 
       part._range_index.store(destination_range_index);
       _free_ranges[free_range_index] = source_range_index;
-
-      if (is_stop)
-      {
-        return;
-      }
     }
   }
 
