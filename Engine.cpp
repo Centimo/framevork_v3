@@ -37,6 +37,8 @@ void Engine::thread_worker(Thread_data& thread_data)
   while (!_is_stop.load())
   {
     long long delta_t_ms = _current_global_time_ms.load() - current_global_time_ms;
+    current_global_time_ms = _current_global_time_ms.load();
+
     if (delta_t_ms < 0)
     {
       delta_t_ms = std::numeric_limits<size_t>::max() - std::abs(delta_t_ms);
@@ -72,8 +74,6 @@ void Engine::thread_worker(Thread_data& thread_data)
     }
 
     thread_data.process_particles(delta_t_ms);
-
-    current_global_time_ms = _current_global_time_ms.load();
   }
 }
 
@@ -210,7 +210,7 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
 
   size_t mininmal_lifetime_border = std::numeric_limits<size_t>::max();
   {
-    int number_of_particles_to_replace = particles_number - _particles.size();
+    int number_of_particles_to_replace = particles_number - _particles.empty_number();
     if (number_of_particles_to_replace > 0)
     {
       mininmal_lifetime_border =
