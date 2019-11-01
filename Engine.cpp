@@ -238,8 +238,9 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
               [(particles_number - 1) / _particles_pack_size].value()
               [(particles_number - 1) % _particles_pack_size];
 
+
           if (!particle_optional
-            || particle_optional.value().get()._lifetime >= mininmal_lifetime_border)
+              || particle_optional.value().get()._lifetime >= mininmal_lifetime_border)
           {
             --particles_number;
             return result;
@@ -288,7 +289,7 @@ Engine::Particles_by_lifetime_counter::Particles_by_lifetime_counter()
 {
   for (size_t i = 0; i < _counter.size(); ++i)
   {
-    _counter[i] = { i * (500 + (size_t)std::pow(1.5, 2*i)), 0 };
+    _counter[i] = { i * (10 + (size_t)std::pow(1.5, 2*i)), 0 };
   }
 }
 

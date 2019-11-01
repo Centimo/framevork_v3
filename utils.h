@@ -9,5 +9,5 @@
 
 namespace utils
 {
-  size_t two_to_the_power_of(size_t exponenta);
+  size_t two_to_the_power_of(size_t exponent);
 }
