@@ -32,7 +32,6 @@ void Engine::call_function_for_all_particles(const std::function<void(size_t, si
 void Engine::thread_worker(Thread_data& thread_data)
 {
   size_t current_global_time_ms = 0;
-  std::array< std::optional< Particles_pack>, _max_explosions_pops_per_cycle> particles_packs;
 
   while (!_is_stop.load())
   {

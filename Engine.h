@@ -26,7 +26,6 @@ class Engine
 
   constexpr static size_t _total_particles_number = 2048 * _particles_pack_size;
   constexpr static size_t _parts_number_per_thread = 64;
-  constexpr static size_t _max_explosions_pops_per_cycle = 5;
   constexpr static size_t _max_cycles_for_explosions_receiving = 5;
   constexpr static size_t _explosions_buffer_size = 40;
   constexpr static double _probability_of_disappearing = 0.0002;
@@ -34,7 +33,6 @@ class Engine
   constexpr static double _scale_for_weibull = 80.0; // random speed scale
 
 
-  using Particles_packs_array = std::array< std::optional<Particles_pack>, _max_explosions_pops_per_cycle>;
 
   class Particles_by_lifetime_counter
   {
