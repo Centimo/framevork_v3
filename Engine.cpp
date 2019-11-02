@@ -285,8 +285,8 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
 
 Engine::Thread_data::Thread_data(Engine& engine, size_t threads_number, size_t particles_number, size_t parts_number)
   : _engine(engine),
-    _explosions_from_user(threads_number, static_cast<size_t>(std::log2(particles_number / 160)) + 1),
-    _explosions(threads_number, static_cast<size_t>(std::log2(particles_number / 40)) + 1),
+    _explosions_from_user(1, static_cast<size_t>(std::log2(100 / threads_number)) + 1),
+    _explosions(1, static_cast<size_t>(std::log2(particles_number / threads_number / 10)) + 1),
     _explosions_buffer(_explosions_buffer_size),
     _particles(particles_number, parts_number),
     _thread(&Engine::thread_worker, &engine, std::ref(*this))
