@@ -2,7 +2,8 @@ glut/
 cmake-build-*/
 .idea/
 GL/
-ConsoleApplication*
+ConsoleApplication*.*
+.vs/
 
 Release/
 Debug/
