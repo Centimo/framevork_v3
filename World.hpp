@@ -10,7 +10,7 @@ template <size_t dimensions_number>
 struct World
 {
   template <typename Value_type>
-  struct Vector : public std::array<Value_type, dimensions_number> // TODO fix type (size_t to double?)
+  struct Vector : public std::array<Value_type, dimensions_number>
   { 
     friend Vector
       operator * (
@@ -61,8 +61,11 @@ struct World
 
       return *this;
     }
-  };
 
+    template <typename ... Arguments_types>
+    static Vector make_from_radius_and_angle(Arguments_types... arguments);
+  };
+  
   using Radius_vector = Vector<float>;
   using Position_vector = Vector<float>;
 
@@ -89,3 +92,11 @@ struct World
 
   using Explosion = Position_vector;
 };
+
+template <>
+template <>
+template <>
+inline World<2>::Vector<float> World<2>::Vector<float>::make_from_radius_and_angle(float radius, float angle_rad)
+{
+  return { radius * std::sinf(radius), radius * std::cosf(radius) };
+}

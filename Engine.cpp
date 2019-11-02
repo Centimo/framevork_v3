@@ -89,10 +89,10 @@ std::optional<Engine::Particles_pack>
   for (World_t::Particle& particle : result)
   {
     particle = { explosion.value(),
-                 {
+                 World_t::Position_vector::make_from_radius_and_angle(
                    _random_generator.get_random_float_from_weibull(_scale_for_weibull),
-                   _random_generator.get_random_float_from_weibull(_scale_for_weibull)
-                 },
+                   _random_generator.get_random_float_from_uniform(M_2_PI)
+                 ),
                  0
                };
   }

@@ -44,7 +44,7 @@ void WorkerThread(void)
 
     if (counter > 1000)
     {
-      // std::cout << engine->get_debug_data() << std::endl;
+      //std::cout << engine->get_debug_data() << std::endl;
       std::cout << "FPS: " << render_counter.load() << std::endl;
 
       render_counter.store(0);

@@ -10,6 +10,9 @@
 #include <cmath>
 #include <string>
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #include "Containers/Atomic_queue.hpp"
 #include "Containers/OROW_vector.hpp"
 
