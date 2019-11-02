@@ -134,7 +134,7 @@ std::string Engine::get_debug_data()
     result += "Thread: " + std::to_string(i);
     result += ", explosion size: " + std::to_string(thread->_explosions.size());
     result += ", particles size: " + std::to_string(thread->_particles.size());
-    result += ", empty number: " + std::to_string(thread->_particles.empty_number());
+    result += ", empty number: " + std::to_string(thread->_particles.get_number_of_empty_elements());
     result += "\n";
   }
 
