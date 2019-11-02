@@ -71,7 +71,7 @@ private:
 public:
   OROW_vector(size_t size, size_t parts_number)
       : _ranges_size(size / parts_number + 1),
-        _desired_size(size),
+        _size(size),
         _ranges(Range::make_vector_of_ranges(parts_number + _additional_ranges_number, _ranges_size)),
         _parts(Part::make_vector_of_parts(parts_number, _ranges_size)),
         _free_ranges({parts_number, parts_number + 1}),
@@ -151,15 +151,15 @@ public:
 
   size_t size() const
   {
-    return _desired_size - _empty_elements_number.load();
+    return _size - _empty_elements_number.load();
   }
 
   bool is_empty() const
   {
-    return _desired_size == _empty_elements_number.load();
+    return _size == _empty_elements_number.load();
   }
 
-  size_t empty_number() const
+  size_t get_number_of_empty_elements() const
   {
     return _empty_elements_number.load();
   }
@@ -167,7 +167,7 @@ public:
 private:
   const size_t _ranges_size;
   const std::vector<Range> _ranges;
-  const size_t _desired_size;
+  const size_t _size;
 
   std::vector<std::optional<Value_type> > _elements;
   std::vector<Part> _parts;

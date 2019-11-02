@@ -211,7 +211,7 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
 
   size_t mininmal_lifetime_border = std::numeric_limits<size_t>::max();
   {
-    int number_of_particles_to_replace = particles_number - _particles.empty_number();
+    int number_of_particles_to_replace = particles_number - _particles.get_number_of_empty_elements();
     if (number_of_particles_to_replace > 0)
     {
       mininmal_lifetime_border =
