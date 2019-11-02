@@ -163,12 +163,14 @@ Engine::Engine(const World_t::Position_vector& borders, size_t threads_number) :
 
   for (size_t i = 0; i < threads_with_additional_particle; i++)
   {
-    _threads.emplace_back(new Engine::Thread_data(*this, particles_number_per_thread + 1, _parts_number_per_thread));
+    _threads.emplace_back(
+      new Engine::Thread_data(*this, threads_number, particles_number_per_thread + 1, _parts_number_per_thread));
   }
 
   for (size_t i = threads_with_additional_particle; i < threads_number; i++)
   {
-    _threads.emplace_back(new Engine::Thread_data(*this, particles_number_per_thread, _parts_number_per_thread));
+    _threads.emplace_back(
+      new Engine::Thread_data(*this, threads_number, particles_number_per_thread, _parts_number_per_thread));
   }
 
   _threads_cyclic_index.store(0);
@@ -281,10 +283,10 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
       });
 }
 
-Engine::Thread_data::Thread_data(Engine& engine, size_t particles_number, size_t parts_number)
+Engine::Thread_data::Thread_data(Engine& engine, size_t threads_number, size_t particles_number, size_t parts_number)
   : _engine(engine),
-    _explosions_from_user(static_cast<size_t>(std::log2(particles_number / 160)) + 1),
-    _explosions(static_cast<size_t>(std::log2(particles_number / 40)) + 1),
+    _explosions_from_user(threads_number, static_cast<size_t>(std::log2(particles_number / 160)) + 1),
+    _explosions(threads_number, static_cast<size_t>(std::log2(particles_number / 40)) + 1),
     _explosions_buffer(_explosions_buffer_size),
     _particles(particles_number, parts_number),
     _thread(&Engine::thread_worker, &engine, std::ref(*this))
