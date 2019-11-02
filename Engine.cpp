@@ -219,6 +219,7 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
   }
 
   _particles_counter.clear();
+
   _particles.call_function_for_all_elements(
       [this, delta_t_ms, &particles_number, mininmal_lifetime_border]
         (
@@ -249,11 +250,15 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
 
         const World_t::Particle& particle = particle_optional.value();
 
-        if (_random_generator.get_random_bool_from_probability(_probability_of_disappearing * delta_t_ms))
+        if (_random_generator.get_random_bool_from_probability(
+                                1 - std::pow(1 - _probability_of_disappearing, delta_t_ms)
+                              ))
         {
           return std::nullopt;
         }
-        else if (_random_generator.get_random_bool_from_probability(_probability_of_exploding * delta_t_ms))
+        else if (_random_generator.get_random_bool_from_probability(
+                                     1 - std::pow(1 - _probability_of_exploding, delta_t_ms)
+                                   ))
         {
           _engine.send_explosion(particle._position[0], particle._position[1]);
           return std::nullopt;
