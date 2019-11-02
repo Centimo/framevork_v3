@@ -10,9 +10,10 @@
 #include <cmath>
 #include <string>
 
-#include "Atomic_queue.hpp"
+#include "Containers/Atomic_queue.hpp"
+#include "Containers/OROW_vector.hpp"
+
 #include "World.hpp"
-#include "OROW_vector.hpp"
 
 
 class Engine
@@ -36,13 +37,15 @@ class Engine
 
   class Particles_by_lifetime_counter
   {
-    std::array<std::array<size_t, 2>, 10> _counter;
+    std::array<size_t, 10> _lifetime_borders;
+    std::array<size_t, 10> _counter;
 
   public:
     Particles_by_lifetime_counter();
 
     void add_particle(size_t lifetime_ms);
     size_t get_minimal_lifetime_for_oldest_particles_number(size_t particles_number);
+    void clear();
   };
 
   class Random_generator

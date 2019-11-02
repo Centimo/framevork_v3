@@ -218,6 +218,7 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
     }
   }
 
+  _particles_counter.clear();
   _particles.call_function_for_all_elements(
       [this, delta_t_ms, &particles_number, mininmal_lifetime_border]
         (
@@ -238,7 +239,7 @@ void Engine::Thread_data::process_particles(const size_t delta_t_ms)
               [(particles_number - 1) % _particles_pack_size];
 
 
-          if (!particle_optional
+          if (!particle_optional.has_value()
               || particle_optional.value().get()._lifetime >= mininmal_lifetime_border)
           {
             --particles_number;
@@ -286,9 +287,11 @@ Engine::Thread_data::Thread_data(Engine& engine, size_t particles_number, size_t
 
 Engine::Particles_by_lifetime_counter::Particles_by_lifetime_counter()
 {
-  for (size_t i = 0; i < _counter.size(); ++i)
+  _counter.fill(0);
+
+  for (size_t i = 0; i < _lifetime_borders.size(); ++i)
   {
-    _counter[i] = { i * (10 + (size_t)std::pow(1.5, 2*i)), 0 };
+    _lifetime_borders[i] = i * (10 + (size_t)std::pow(1.5, 2*i));
   }
 }
 
@@ -296,11 +299,16 @@ void Engine::Particles_by_lifetime_counter::add_particle(const size_t lifetime_m
 {
   for (int i = _counter.size() - 1; i >= 0; --i)
   {
-    if (lifetime_ms >= _counter[i][0])
+    if (lifetime_ms >= _lifetime_borders[i])
     {
-      ++_counter[i][1];
+      ++_counter[i];
     }
   }
+}
+
+void Engine::Particles_by_lifetime_counter::clear()
+{
+  _counter.fill(0);
 }
 
 size_t Engine::Particles_by_lifetime_counter::
@@ -309,11 +317,11 @@ size_t Engine::Particles_by_lifetime_counter::
   int particles_remaining = particles_number;
   for (int i = _counter.size() - 1; i >= 0; --i)
   {
-    particles_remaining -= _counter[i][1];
+    particles_remaining -= _counter[i];
 
     if (particles_remaining <= 0)
     {
-      return _counter[i][0];
+      return _lifetime_borders[i];
     }
   }
 
