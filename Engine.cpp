@@ -347,7 +347,12 @@ bool Engine::Random_generator::get_random_bool_from_probability(double probabili
 
 float Engine::Random_generator::get_random_float_from_weibull(double scale)
 {
-  std::bernoulli_distribution bernoulli_distribution(0.5);
   std::weibull_distribution<float> weibull_distribution(2.5, scale);
-  return (bernoulli_distribution(_generator) ? 1 : -1) * weibull_distribution(_generator);
+  return weibull_distribution(_generator);
+}
+
+float Engine::Random_generator::get_random_float_from_uniform(double max_value)
+{
+  std::uniform_real_distribution<float> uniform_distribution(max_value);
+  return uniform_distribution(_generator);
 }
