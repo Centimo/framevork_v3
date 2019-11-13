@@ -92,9 +92,9 @@ public:
 
       for (size_t i = range._start_index; i < range._start_index + part._elements_number; ++i)
       {
-        if (auto value = _elements[i])
+        if (_elements[i].has_value())
         {
-          function(value.value());
+          function(_elements[i].value());
         }
       }
 
