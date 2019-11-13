@@ -94,6 +94,7 @@ public:
   void change_borders(const World_t::Position_vector& new_borders);
   size_t get_particles_number();
   std::string get_debug_data();
+  size_t get_process_counter();
 
 private:
   void send_explosion(size_t x_coordinate, size_t y_coordinate);
@@ -106,6 +107,8 @@ private:
   std::atomic<bool> _is_stop;
   std::atomic<size_t> _current_global_time_ms;
   std::array<std::atomic<float>, _dimensions_number> _borders;
+
+  std::atomic<size_t> _process_counter;
 };
 
 

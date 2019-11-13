@@ -73,6 +73,7 @@ void Engine::thread_worker(Thread_data& thread_data)
     }
 
     thread_data.process_particles(delta_t_ms);
+    _process_counter.fetch_add(1);
   }
 }
 
@@ -140,6 +141,12 @@ std::string Engine::get_debug_data()
 
 
   return result;
+}
+
+
+size_t Engine::get_process_counter()
+{
+  return _process_counter.exchange(0); 
 }
 
 Engine::Engine(const World_t::Position_vector& borders, size_t threads_number) : 
